@@ -109,6 +109,7 @@ class BetterFeedback extends StatefulWidget {
     this.localeOverride,
     this.mode = FeedbackMode.draw,
     this.pixelRatio = 3.0,
+    this.router,
   })  : assert(
           pixelRatio > 0,
           'pixelRatio needs to be larger than 0',
@@ -124,6 +125,8 @@ class BetterFeedback extends StatefulWidget {
   /// Defaults to [StringFeedback] which uses a single editable text field to
   /// prompt for input.
   final FeedbackBuilder? feedbackBuilder;
+
+  final Navigator? router;
 
   /// The Theme, which gets used to style the feedback ui.
   final FeedbackThemeData? theme;

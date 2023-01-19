@@ -139,154 +139,140 @@ class FeedbackWidgetState extends State<FeedbackWidget>
     // the bottom sheet because navigators block interaction on widgets behind
     // them but the background widgets need to be tap-able behind the bottom
     // sheet.
-    return Navigator(
-      onGenerateRoute: (_) {
-        return MaterialPageRoute<void>(
-          builder: (context) {
-            return Material(
-              color: FeedbackTheme.of(context).background,
-              child: AnimatedBuilder(
-                animation: _controller,
-                // Place the screenshot here so that the widget tree isn't being
-                // arbitrarily rebuilt.
-                child: Screenshot(
-                  controller: screenshotController,
-                  child: PaintOnChild(
-                    controller: painterController,
-                    isPaintingActive:
-                        mode == FeedbackMode.draw && widget.isFeedbackVisible,
-                    child: widget.child,
+    return Material(
+      color: FeedbackTheme.of(context).background,
+      child: AnimatedBuilder(
+        animation: _controller,
+        // Place the screenshot here so that the widget tree isn't being
+        // arbitrarily rebuilt.
+        child: Screenshot(
+          controller: screenshotController,
+          child: PaintOnChild(
+            controller: painterController,
+            isPaintingActive:
+                mode == FeedbackMode.draw && widget.isFeedbackVisible,
+            child: widget.child,
+          ),
+        ),
+        builder: (context, screenshotChild) {
+          return CustomMultiChildLayout(
+            children: [
+              LayoutId(
+                id: _screenshotId,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: padding),
+                  child: ScaleAndFade(
+                    progress: sheetProgress,
+                    minScale: .7,
+                    // If opacity reaches zero, flutter will stop
+                    // drawing the child widget which breaks the
+                    // screenshot.
+                    minOpacity: .01,
+                    child: LayoutBuilder(builder: (context, constraints) {
+                      final size = MediaQuery.of(context).size;
+                      return OverflowBox(
+                        // Allow the screenshot to overflow to the full
+                        // screen size and then scale it down to meet
+                        // it's parent's constraints.
+                        maxWidth: size.width,
+                        maxHeight: size.height,
+                        child: ScaleAndClip(
+                          progress: animation.value,
+                          // Scale down to fit the constraints.
+                          // `_FeedbackLayoutDelegate` ensures that the
+                          // constraints are the same aspect ratio as
+                          // the query size.
+                          scaleFactor: constraints.maxWidth / size.width,
+                          child: LayoutBuilder(builder: (context, constraints) {
+                            return screenshotChild!;
+                          }),
+                        ),
+                      );
+                    }),
                   ),
                 ),
-                builder: (context, screenshotChild) {
-                  return CustomMultiChildLayout(
-                    children: [
-                      LayoutId(
-                        id: _screenshotId,
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: padding),
-                          child: ScaleAndFade(
-                            progress: sheetProgress,
-                            minScale: .7,
-                            // If opacity reaches zero, flutter will stop
-                            // drawing the child widget which breaks the
-                            // screenshot.
-                            minOpacity: .01,
-                            child:
-                                LayoutBuilder(builder: (context, constraints) {
-                              final size = MediaQuery.of(context).size;
-                              return OverflowBox(
-                                // Allow the screenshot to overflow to the full
-                                // screen size and then scale it down to meet
-                                // it's parent's constraints.
-                                maxWidth: size.width,
-                                maxHeight: size.height,
-                                child: ScaleAndClip(
-                                  progress: animation.value,
-                                  // Scale down to fit the constraints.
-                                  // `_FeedbackLayoutDelegate` ensures that the
-                                  // constraints are the same aspect ratio as
-                                  // the query size.
-                                  scaleFactor:
-                                      constraints.maxWidth / size.width,
-                                  child: LayoutBuilder(
-                                      builder: (context, constraints) {
-                                    return screenshotChild!;
-                                  }),
-                                ),
-                              );
-                            }),
-                          ),
-                        ),
-                      ),
-                      if (!animation.isDismissed)
-                        LayoutId(
-                          id: _controlsColumnId,
-                          child: Padding(
-                            padding: EdgeInsets.only(left: padding),
-                            child: ScaleAndFade(
-                              progress: sheetProgress,
-                              minScale: .7,
-                              child: ControlsColumn(
-                                mode: mode,
-                                activeColor: painterController.drawColor,
-                                colors: widget.drawColors,
-                                onColorChanged: (color) {
-                                  setState(() {
-                                    painterController.drawColor = color;
-                                  });
-                                  _hideKeyboard(context);
-                                },
-                                onUndo: () {
-                                  painterController.undo();
-                                  _hideKeyboard(context);
-                                },
-                                onClearDrawing: () {
-                                  painterController.clear();
-                                  _hideKeyboard(context);
-                                },
-                                onControlModeChanged: (mode) {
-                                  setState(() {
-                                    this.mode = mode;
-                                    _hideKeyboard(context);
-                                  });
-                                },
-                                onCloseFeedback: () {
-                                  _hideKeyboard(context);
-                                  BetterFeedback.of(context).hide();
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-                      if (!animation.isDismissed)
-                        LayoutId(
-                          id: _sheetId,
-                          child: NotificationListener<
-                              DraggableScrollableNotification>(
-                            onNotification: (notification) {
-                              sheetProgress.value = (notification.extent -
-                                      notification.minExtent) /
-                                  (notification.maxExtent -
-                                      notification.minExtent);
-                              return false;
-                            },
-                            child: FeedbackBottomSheet(
-                              key: const Key('feedback_bottom_sheet'),
-                              feedbackBuilder: widget.feedbackBuilder,
-                              onSubmit: (
-                                String feedback, {
-                                Map<String, dynamic>? extras,
-                              }) async {
-                                await _sendFeedback(
-                                  context,
-                                  BetterFeedback.of(context).onFeedback!,
-                                  screenshotController,
-                                  feedback,
-                                  widget.pixelRatio,
-                                  extras: extras,
-                                );
-                                painterController.clear();
-                              },
-                              sheetProgress: sheetProgress,
-                            ),
-                          ),
-                        ),
-                    ],
-                    delegate: _FeedbackLayoutDelegate(
-                      displayFeedback: !animation.isDismissed,
-                      query: MediaQuery.of(context),
-                      sheetFraction:
-                          FeedbackTheme.of(context).feedbackSheetHeight,
-                      animationProgress: animation.value,
-                    ),
-                  );
-                },
               ),
-            );
-          },
-        );
-      },
+              if (!animation.isDismissed)
+                LayoutId(
+                  id: _controlsColumnId,
+                  child: Padding(
+                    padding: EdgeInsets.only(left: padding),
+                    child: ScaleAndFade(
+                      progress: sheetProgress,
+                      minScale: .7,
+                      child: ControlsColumn(
+                        mode: mode,
+                        activeColor: painterController.drawColor,
+                        colors: widget.drawColors,
+                        onColorChanged: (color) {
+                          setState(() {
+                            painterController.drawColor = color;
+                          });
+                          _hideKeyboard(context);
+                        },
+                        onUndo: () {
+                          painterController.undo();
+                          _hideKeyboard(context);
+                        },
+                        onClearDrawing: () {
+                          painterController.clear();
+                          _hideKeyboard(context);
+                        },
+                        onControlModeChanged: (mode) {
+                          setState(() {
+                            this.mode = mode;
+                            _hideKeyboard(context);
+                          });
+                        },
+                        onCloseFeedback: () {
+                          _hideKeyboard(context);
+                          BetterFeedback.of(context).hide();
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              if (!animation.isDismissed)
+                LayoutId(
+                  id: _sheetId,
+                  child: NotificationListener<DraggableScrollableNotification>(
+                    onNotification: (notification) {
+                      sheetProgress.value =
+                          (notification.extent - notification.minExtent) /
+                              (notification.maxExtent - notification.minExtent);
+                      return false;
+                    },
+                    child: FeedbackBottomSheet(
+                      key: const Key('feedback_bottom_sheet'),
+                      feedbackBuilder: widget.feedbackBuilder,
+                      onSubmit: (
+                        String feedback, {
+                        Map<String, dynamic>? extras,
+                      }) async {
+                        await _sendFeedback(
+                          context,
+                          BetterFeedback.of(context).onFeedback!,
+                          screenshotController,
+                          feedback,
+                          widget.pixelRatio,
+                          extras: extras,
+                        );
+                        painterController.clear();
+                      },
+                      sheetProgress: sheetProgress,
+                    ),
+                  ),
+                ),
+            ],
+            delegate: _FeedbackLayoutDelegate(
+              displayFeedback: !animation.isDismissed,
+              query: MediaQuery.of(context),
+              sheetFraction: FeedbackTheme.of(context).feedbackSheetHeight,
+              animationProgress: animation.value,
+            ),
+          );
+        },
+      ),
     );
   }
 
